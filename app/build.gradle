@@ -1,0 +1,138 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.3"
+
+    def versionPropsFile = file('version.properties')
+    if (versionPropsFile.canRead()) {
+        def Properties versionProps = new Properties()
+
+        versionProps.load(new FileInputStream(versionPropsFile))
+
+        def betaNumber = versionProps['BETA_NUMBER'].toInteger()
+        def versionPatch = versionProps['VERSION_PATCH'].toInteger()
+        def versionBuild = versionProps['VERSION_BUILD'].toInteger() + 1
+        def versionNumber = versionProps['VERSION_NUMBER'].toInteger()
+
+        def runTasks = gradle.startParameter.taskNames
+        if (':app:assembleRelease' in runTasks) {
+            if (versionProps['BETA_NUMBER'].toInteger() == 0)
+                versionPatch = versionProps['VERSION_PATCH'].toInteger() + 1
+            betaNumber = 0
+            versionNumber = versionProps['VERSION_NUMBER'].toInteger() + 1
+        } else if (':app:assembleBeta' in runTasks) {
+            if (versionProps['BETA_NUMBER'].toInteger() == 0) {
+                versionPatch = versionProps['VERSION_PATCH'].toInteger() + 1
+            }
+            betaNumber = versionProps['BETA_NUMBER'].toInteger() + 1
+            versionNumber = versionProps['VERSION_NUMBER'].toInteger() + 1
+        }
+
+        versionBuild = versionProps['VERSION_BUILD'].toInteger() + 1
+
+        def versionMajor = 1
+        def versionMinor = 0
+
+
+        versionProps['VERSION_PATCH'] = versionPatch.toString()
+        versionProps['VERSION_BUILD'] = versionBuild.toString()
+        versionProps['VERSION_NUMBER'] = versionNumber.toString()
+        versionProps['BETA_NUMBER'] = betaNumber.toString()
+
+        versionProps.store(versionPropsFile.newWriter(), null)
+
+        if (':app:assembleRelease' in runTasks) {
+            defaultConfig {
+                versionCode versionNumber
+                versionName "${versionMajor}.${versionMinor}.${versionPatch} (${versionBuild})"
+                minSdkVersion 23
+                targetSdkVersion 24
+            }
+        } else if (':app:assembleBeta' in runTasks) {
+            defaultConfig {
+                versionCode versionNumber
+                versionName "${versionMajor}.${versionMinor}.${versionPatch} (${versionBuild}) BETA ${betaNumber}"
+                minSdkVersion 23
+                targetSdkVersion 24
+            }
+        } else {
+            defaultConfig {
+                versionCode versionNumber
+                versionName "${versionMajor}.${versionMinor}.${versionPatch} (${versionBuild})"
+                minSdkVersion 23
+                targetSdkVersion 24
+            }
+        }
+
+        applicationVariants.all { variant ->
+            if (':app:assembleRelease' in runTasks) {
+                variant.outputs.each { output ->
+                    def outputFile = output.outputFile
+                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+                        output.outputFile = new File(getProject().getRootDir(), "app/apk/${versionMajor}.${versionMinor}.${versionPatch}(${versionNumber})/release.apk")
+                    }
+                }
+//                copy {
+//                    from "${rootDir}/app/build/outputs/mapping/release/mapping.txt"
+//                    into "${rootDir}/app/apk/${versionMajor}.${versionMinor}.${versionPatch}(${versionNumber})/"
+//                    rename { String fileName ->
+//                        "mapping-release.txt"
+//                    }
+//                }
+            } else if (':app:assembleBeta' in runTasks) {
+                variant.outputs.each { output ->
+                    def outputFile = output.outputFile
+                    if (outputFile != null && outputFile.name.endsWith('.apk')) {
+                        output.outputFile = new File(getProject().getRootDir(), "app/apk/${versionMajor}.${versionMinor}.${versionPatch}(${versionNumber})-BETA/beta-release(${betaNumber}).apk")
+                    }
+                }
+//                copy {
+//                    from "${rootDir}/app/build/outputs/mapping/beta/mapping.txt"
+//                    into "${rootDir}/app/apk/${versionMajor}.${versionMinor}.${versionPatch}(${versionNumber})-BETA/"
+//                    rename { String fileName ->
+//                        "mapping-beta.txt"
+//                    }
+//                }
+            }
+        }
+
+
+    } else {
+        throw new GradleException("Could not read version.properties!")
+    }
+
+    defaultConfig {
+        applicationId "com.danielstone.doubletapapp"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "ENVIRONMENT", "\"production\""
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+            buildConfigField "String", "ENVIRONMENT", "\"development\""
+        }
+        beta {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "ENVIRONMENT", "\"development\""
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:24.2.1'
+    compile 'com.android.support:design:24.2.1'
+    compile 'com.android.support:cardview-v7:24.2.1'
+
+    testCompile 'junit:junit:4.12'
+}
